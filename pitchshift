@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+# Usage: pitchshift input.mp3 output.mp3 -2
+# (negative = down, positive = up)
+
+if [ $# -ne 3 ]; then
+    echo "Usage: $0 <input> <output> <semitones>"
+    exit 1
+fi
+
+INPUT="$1"
+OUTPUT="$2"
+SEMITONES="$3"
+
+# Extract actual sample rate from the input file
+SR=$(ffprobe -v error -select_streams a:0 -show_entries stream=sample_rate \
+    -of default=noprint_wrappers=1:nokey=1 "$INPUT")
+
+if [ -z "$SR" ]; then
+    echo "Could not detect sample rate from input file."
+    exit 1
+fi
+
+# Build FFmpeg pitch expression using its own math functions
+# FACTOR = pow(2, semitones/12)
+FACTOR_EXPR="pow(2\\,${SEMITONES}/12)"
+
+FILTER="asetrate=${SR}*${FACTOR_EXPR},aresample=${SR},atempo=1/${FACTOR_EXPR}"
+
+echo "Using sample rate: $SR"
+echo "FFmpeg filter: $FILTER"
+
+ffmpeg -i "$INPUT" -af "$FILTER" "$OUTPUT"
